@@ -1,0 +1,657 @@
+package com.example.user01.deebates1;
+
+import android.Manifest;
+import android.content.Context;
+import android.content.Intent;
+import android.content.pm.PackageManager;
+import android.location.Location;
+import android.location.LocationListener;
+import android.location.LocationManager;
+import android.os.Build;
+import android.os.Bundle;
+import android.support.annotation.NonNull;
+import android.support.v4.app.ActivityCompat;
+import android.support.v4.app.FragmentActivity;
+import android.support.v4.content.ContextCompat;
+import android.util.Log;
+import android.view.View;
+import android.widget.Button;
+import android.widget.TextView;
+import android.widget.Toast;
+
+import com.android.volley.AuthFailureError;
+import com.android.volley.Request;
+import com.android.volley.RequestQueue;
+import com.android.volley.Response;
+import com.android.volley.VolleyError;
+import com.android.volley.toolbox.StringRequest;
+import com.android.volley.toolbox.Volley;
+import com.example.user01.deebates1.directionhelpers.FetchURL;
+import com.example.user01.deebates1.directionhelpers.TaskLoadedCallback;
+
+import com.google.android.gms.maps.CameraUpdateFactory;
+import com.google.android.gms.maps.GoogleMap;
+import com.google.android.gms.maps.OnMapReadyCallback;
+import com.google.android.gms.maps.SupportMapFragment;
+import com.google.android.gms.maps.model.LatLng;
+import com.google.android.gms.maps.model.MarkerOptions;
+import com.google.android.gms.maps.model.Polyline;
+import com.google.android.gms.maps.model.PolylineOptions;
+
+import org.json.JSONException;
+import org.json.JSONObject;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Map;
+
+public class MapsActivity extends FragmentActivity implements OnMapReadyCallback ,TaskLoadedCallback{
+
+    private GoogleMap mMap;
+    private MarkerOptions place1, place2,currentLOc;
+    Button startbutton,nextbutton,endbutton;
+    LocationManager locationManager;
+    LocationListener locationListener;
+    private Polyline currentPolyline;
+    LatLng sri_lanka;
+    TextView start,end,eta;
+
+    String driverId,taskPrevious,taskOriginName,taskOriginLat,taskOriginLon,taskDesName,taskDesLat,taskDesLon,taskid,stopPrevious,stopLon,stopLat,startName,endLon,endLat,stopName;
+    @Override
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
+
+                locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 0, 0, locationListener);
+            }
+        }
+    }
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        Log.i("MapsActivity", "working 1");
+        setContentView(R.layout.activity_maps);
+        Log.i("MapsActivity", "working 2");
+        //button instilling
+        startbutton=findViewById(R.id.start);
+        endbutton=findViewById(R.id.end);
+        nextbutton=findViewById(R.id.next);
+
+        MarkerOptions options = new MarkerOptions();
+        ArrayList<LatLng> latlngs = new ArrayList<>();
+        start=(findViewById(R.id.starttext));
+        end=(findViewById(R.id.endText));
+        eta=(findViewById(R.id.eta));
+
+
+
+        driverId = getIntent().getStringExtra("driverId");
+        taskOriginName = getIntent().getStringExtra("taskOriginName");
+        taskOriginLat = getIntent().getStringExtra("taskOriginLat");
+        taskOriginLon = getIntent().getStringExtra("taskOriginLon");
+        taskDesName = getIntent().getStringExtra("taskDesName");
+        taskDesLat = getIntent().getStringExtra("taskDesLat");
+        taskDesLon = getIntent().getStringExtra("taskDesLon");
+        taskPrevious=getIntent().getStringExtra("taskPrevious");
+        start.setText(taskOriginName);
+        end.setText(taskDesName);
+        place1 = new MarkerOptions().position(new LatLng(Double.parseDouble(taskOriginLat), Double.parseDouble(taskOriginLon))).title(taskOriginName);
+        place2 = new MarkerOptions().position(new LatLng(Double.parseDouble(taskDesLat), Double.parseDouble(taskDesLon))).title(taskDesName);
+        sri_lanka = new LatLng(Double.parseDouble(taskOriginLat), Double.parseDouble(taskOriginLon));
+        double test=distance(Double.parseDouble(taskOriginLat),Double.parseDouble(taskOriginLon),Double.parseDouble(taskDesLat),Double.parseDouble(taskDesLon));
+        //Log.i("testingDistance",Double.toString(test*1609.34));
+        // Obtain the SupportMapFragment and get notified when the map is ready to be used.
+        SupportMapFragment mapFragment = (SupportMapFragment) getSupportFragmentManager()
+                .findFragmentById(R.id.mapNearBy);
+        mapFragment.getMapAsync(this);
+
+
+        //getting location from gps
+        locationManager = (LocationManager) this.getSystemService(Context.LOCATION_SERVICE);
+        locationListener=new LocationListener() {
+            @Override
+            public void onLocationChanged(Location location) {
+                currentLOc = new MarkerOptions().position(new LatLng(location.getLatitude(),location.getLongitude())).title(taskDesName);
+
+            }
+
+            @Override
+            public void onStatusChanged(String provider, int status, Bundle extras) {
+
+            }
+
+            @Override
+            public void onProviderEnabled(String provider) {
+
+            }
+
+            @Override
+            public void onProviderDisabled(String provider) {
+
+            }
+        };
+        if (Build.VERSION.SDK_INT < 23) {
+            if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+                // TODO: Consider calling
+                //    ActivityCompat#requestPermissions
+                // here to request the missing permissions, and then overriding
+                //   public void onRequestPermissionsResult(int requestCode, String[] permissions,
+                //                                          int[] grantResults)
+                // to handle the case where the user grants the permission. See the documentation
+                // for ActivityCompat#requestPermissions for more details.
+                return;
+            }
+            locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 0, 0, locationListener);
+
+        }else{
+            if (ContextCompat.checkSelfPermission(this,Manifest.permission.ACCESS_FINE_LOCATION)!=PackageManager.PERMISSION_GRANTED){
+                // ask for permission
+                ActivityCompat.requestPermissions(this,new String[]{Manifest.permission.ACCESS_FINE_LOCATION},1);
+            }else {
+                //we have permission
+                locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 0, 0, locationListener);
+
+            }
+        }
+
+
+        /**
+         * getting the data from mysql
+         * */
+        Log.i("MapsActivity", "working 3");
+        StringRequest stringRequest1= new StringRequest(Request.Method.POST,
+                Constants.ROOT_URL,
+                new Response.Listener<String>() {
+                    @Override
+                    public void onResponse(String response) {
+
+
+                        try {
+                            JSONObject ending = new JSONObject(response);
+                            Log.i("responrdetails", ending.toString());
+
+                            String status = ending.getString("status").toString();
+                            if (status=="true") {
+                               // Toast.makeText(getApplicationContext(), "testing", Toast.LENGTH_LONG).show();
+                                String result = ending.getString("result");
+                                Log.i("workingtest", result);
+                                JSONObject resultobject = new JSONObject(result);
+//                                Log.i("piushapiusha",resultobject.toString());
+//                                // Object[] results=jsonObject.getJSONArray("result");
+                                Log.i("MapsActivity", "working 4");
+                                taskid = resultobject.getString("taskId");
+
+                                Log.i("MapsActivity", "working 5");
+                            }
+                            else{
+                                //Toast.makeText(getApplicationContext(), "nope", Toast.LENGTH_LONG).show();
+                            }
+
+                        } catch(JSONException e){
+                            e.printStackTrace();
+
+                        }
+                    }
+                },
+                new Response.ErrorListener() {
+                    @Override
+                    public void onErrorResponse(VolleyError error) {
+
+                        //Toast.makeText(getApplicationContext(), error.getMessage(), Toast.LENGTH_LONG).show();
+                    }
+                }) {
+            @Override
+            protected Map<String, String> getParams() throws AuthFailureError {
+                Map<String, String> params = new HashMap<>();
+                Log.i("driverId", driverId);
+                String query = "select * from task where driverid='" + driverId + "' AND taskPrevious='"+taskPrevious+"'";
+                Log.i("queryloging",query);
+                params.put("query", query);
+
+
+                return params;
+
+            }
+        };
+
+        RequestQueue requestQueue = Volley.newRequestQueue(this);
+        requestQueue.add(stringRequest1);
+
+
+//        DataParser parser = new DataParser();
+//        double distance=parser.getDist();
+//        Log.i("testingPointParser",Double.toString(distance));
+
+    }
+
+
+    /**
+     * Manipulates the map once available.
+     * This callback is triggered when the map is ready to be used.
+     * This is where we can add markers or lines, add listeners or move the camera. In this case,
+     * we just add a marker near Sydney, Australia.
+     * If Google Play services is not installed on the device, the user will be prompted to install
+     * it inside the SupportMapFragment. This method will only be triggered once the user has
+     * installed Google Play services and returned to the app.
+     */
+    @Override
+    public void onMapReady(GoogleMap googleMap) {
+        mMap = googleMap;
+
+        // Add a marker in Sydney and move the camera
+        mMap.addMarker(place1);
+        mMap.addMarker(place2);
+
+        mMap.moveCamera(CameraUpdateFactory.newLatLng(sri_lanka));
+        mMap.animateCamera(CameraUpdateFactory.newLatLngZoom(sri_lanka,15));
+
+        Log.i("MapsActivity", "working 6");
+        new FetchURL(MapsActivity.this).execute(getUrl(place1.getPosition(), place2.getPosition(), "driving"), "driving");
+        Log.i("MapsActivity", "working 7");
+
+    }
+    private String getUrl(LatLng origin, LatLng dest, String directionMode) {
+        // Origin of route
+        String str_origin = "origin=" + origin.latitude + "," + origin.longitude;
+        // Destination of route
+        String str_dest = "destination=" + dest.latitude + "," + dest.longitude;
+        // Mode
+        String mode = "mode=" + directionMode;
+        // Building the parameters to the web service
+        String parameters = str_origin + "&" + str_dest + "&" + mode;
+        // Output format
+        String output = "json";
+        // Building the url to the web service
+        String url = "https://maps.googleapis.com/maps/api/directions/" + output + "?" + parameters + "&key=" +"AIzaSyBx7CuFXEMGex0L4mVo-9IN0F-oXESezWA" ;
+        return url;
+    }
+
+    @Override
+    public void onTaskDone(Object... values) {
+        if (currentPolyline != null)
+            currentPolyline.remove();
+        currentPolyline = mMap.addPolyline((PolylineOptions) values[0]);
+        Log.i("MapsActivity", "working 8");
+        mMap.clear();
+    }
+
+
+    //for calculating the distance
+    private double distance(double lat1, double lon1, double lat2, double lon2) {
+        double theta = lon1 - lon2;
+        double dist = Math.sin(deg2rad(lat1))
+                * Math.sin(deg2rad(lat2))
+                + Math.cos(deg2rad(lat1))
+                * Math.cos(deg2rad(lat2))
+                * Math.cos(deg2rad(theta));
+        dist = Math.acos(dist);
+        dist = rad2deg(dist);
+        dist = dist * 60 * 1.1515;
+        return (dist);
+    }
+
+    private double deg2rad(double deg) {
+        return (deg * Math.PI / 180.0);
+    }
+
+
+    private double rad2deg(double rad) {
+        return (rad * 180.0 / Math.PI);
+    }
+
+    //getting the task id
+
+
+
+
+    //end button send current task id and driver id
+    public void end( View view ){
+        Log.i("MapsActivity", "working 10");
+
+        Intent afterLogin = new Intent(getApplicationContext(), AfterLogin.class);
+        afterLogin.putExtra("driverId", driverId);
+        afterLogin.putExtra("taskPrevious", taskid);
+
+        Log.i("testingStage","2");
+        startActivity(afterLogin);
+    }
+    public void start(View view){
+        Log.i("MapsActivity", "working 11");
+        StringRequest stringRequest2 = new StringRequest(Request.Method.POST,
+                Constants.ROOT_URL,
+                new Response.Listener<String>() {
+                    @Override
+                    public void onResponse(String response) {
+
+
+                        try {
+                            JSONObject starting = new JSONObject(response);
+
+                            Log.i("start_objects", start.toString());
+                            String status = starting.getString("status").toString();
+
+                            if (status=="true") {
+                               // Toast.makeText(getApplicationContext(), "testing", Toast.LENGTH_LONG).show();
+                                String result = starting.getString("result");
+                                JSONObject resultob = new JSONObject(result);
+                               // Toast.makeText(getApplicationContext(), "Successes", Toast.LENGTH_LONG).show();
+                                Log.i("plsworkpls","working");
+                                String stopLon = resultob.getString("stopLon");
+                                Log.i("plsworkpls","working");
+                                String stopLat=resultob.getString("stopLat");
+                                Log.i("plsworkpls","working");
+                                stopName=resultob.getString("stopName");
+
+                                stopPrevious=resultob.getString("stopId");
+                                if (resultob.getString("stopNext").equals("-1")){
+                                    end.setText(taskDesName);
+                                }
+                                //Toast.makeText(getApplicationContext(),stopName , Toast.LENGTH_LONG).show();
+
+                                end.setText(stopName);
+                                start.setText(taskDesName);
+
+
+
+
+
+//                                place2 = new MarkerOptions().position(new LatLng(Double.parseDouble(stopLat), Double.parseDouble(stopLon))).title(stopName);
+//                                mMap.addMarker(place1);
+//                                mMap.addMarker(place2);
+
+
+
+
+
+                            }else{
+                                endbutton.setVisibility(View.VISIBLE);
+                                start.setText(taskDesName);
+
+                            }
+
+                        } catch(JSONException e){
+                            e.printStackTrace();
+
+                        }
+                    }
+                },
+                new Response.ErrorListener() {
+                    @Override
+                    public void onErrorResponse(VolleyError error) {
+
+                        //Toast.makeText(getApplicationContext(), error.getMessage(), Toast.LENGTH_LONG).show();
+                    }
+                }) {
+            @Override
+            protected Map<String, String> getParams() throws AuthFailureError {
+                Map<String, String> params = new HashMap<>();
+                Log.i("driverId", driverId);
+                String query = "select * from stop where taskId='" + taskid + "' AND stopPrevious='"+"-1'";
+                Log.i("queryloging",query);
+                params.put("query", query);
+
+
+                return params;
+
+
+            }
+        };
+        RequestQueue requestQueue = Volley.newRequestQueue(this);
+        requestQueue.add(stringRequest2);
+        Log.i("MapsActivity", "working 12");
+        startbutton.setVisibility(View.INVISIBLE);
+        nextbutton.setVisibility(View.VISIBLE);
+
+        mMap.clear();Log.i("place1Marker","working");
+
+        place2.position((new LatLng(Double.parseDouble(stopLat), Double.parseDouble(stopLon))));
+        Log.i("place1Marker","working");
+        mMap.addMarker(place1);
+        mMap.addMarker(place2);
+        Log.i("place1Marker","working2");
+
+    }
+    public void next(View view){
+        StringRequest nextRequest = new StringRequest(Request.Method.POST,
+                Constants.ROOT_URL,
+                new Response.Listener<String>() {
+                    @Override
+                    public void onResponse(String response) {
+
+
+                        try {
+                            JSONObject next = new JSONObject(response);
+
+                            Log.i("start_objects", start.toString());
+                            String status = next.getString("status").toString();
+
+                            if (status=="true") {
+                                //Toast.makeText(getApplicationContext(), "testing", Toast.LENGTH_LONG).show();
+                                String result = next.getString("result");
+                                JSONObject resultob = new JSONObject(result);
+                                String stopNext=resultob.getString("stopNext");
+                                Log.i("stopNext",stopNext);
+                                if (stopNext.equals("-1")){
+                                    nextbutton.setVisibility(View.INVISIBLE);
+                                    endbutton.setVisibility(View.VISIBLE);
+                                }
+                               // Toast.makeText(getApplicationContext(), "Successes", Toast.LENGTH_LONG).show();
+                                Log.i("plsworkpls","working");
+                                stopLon = resultob.getString("stopLon");
+                                Log.i("plsworkpls","working");
+                                stopLat=resultob.getString("stopLat");
+                                Log.i("plsworkpls","working");
+                                stopPrevious=resultob.getString("stopId");
+
+                                String stopName=resultob.getString("stopName");
+                                //Toast.makeText(getApplicationContext(),stopName , Toast.LENGTH_LONG).show();
+                                start.setText(startName);
+                                end.setText(stopName);
+                                startName=stopName;
+
+
+
+
+//                                place2 = new MarkerOptions().position(new LatLng(Double.parseDouble(stopLat), Double.parseDouble(stopLon))).title(stopName);
+//                                mMap.addMarker(place1);
+//                                mMap.addMarker(place2);
+
+
+
+
+
+                            }
+
+                        } catch(JSONException e){
+                            e.printStackTrace();
+
+                        }
+                    }
+                },
+                new Response.ErrorListener() {
+                    @Override
+                    public void onErrorResponse(VolleyError error) {
+
+                        Toast.makeText(getApplicationContext(), error.getMessage(), Toast.LENGTH_LONG).show();
+                    }
+                }) {
+            @Override
+            protected Map<String, String> getParams() throws AuthFailureError {
+                Map<String, String> params = new HashMap<>();
+                Log.i("driverId", driverId);
+                String query = "select * from stop where taskId='" + taskid + "' AND stopPrevious='"+stopPrevious+"'";
+                Log.i("queryloging",query);
+                params.put("query", query);
+
+
+                return params;
+
+
+            }
+        };
+        RequestQueue requestQueue = Volley.newRequestQueue(this);
+        requestQueue.add(nextRequest);
+    }
+
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    tools:context=".MapsActivity"
+    >
+
+    <fragment xmlns:map="http://schemas.android.com/apk/res-auto"
+        android:id="@+id/map"
+        class="com.google.android.gms.maps.SupportMapFragment"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_weight="3"
+        android:scrollbars="vertical" />
+
+    <android.support.constraint.ConstraintLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_gravity="bottom">
+
+        <TextView
+            android:id="@+id/textView2"
+            android:layout_width="match_parent"
+            android:layout_height="152dp"
+            android:layout_marginBottom="8dp"
+            android:layout_marginTop="8dp"
+            android:alpha="0.5"
+            android:background="#007FA3"
+            app:layout_constraintBottom_toBottomOf="@+id/start"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintTop_toTopOf="@+id/starttext"
+            app:layout_constraintVertical_bias="0.38" />
+
+        <TextView
+            android:id="@+id/starttext"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="116dp"
+            android:gravity="center"
+            android:text="starttext"
+            android:textColor="@android:color/background_light"
+            android:textSize="24sp"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintStart_toStartOf="parent" />
+
+        <TextView
+            android:id="@+id/endText"
+            android:layout_width="match_parent"
+            android:layout_height="34dp"
+            android:gravity="center"
+            android:text="endText"
+            android:textColor="@android:color/background_light"
+            android:textSize="24sp"
+            app:layout_constraintStart_toStartOf="@+id/eta"
+            app:layout_constraintTop_toBottomOf="@+id/starttext" />
+
+        <TextView
+            android:id="@+id/eta"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_marginStart="8dp"
+            android:gravity="center"
+            android:text="ETA"
+            android:textColor="@android:color/background_light"
+            android:textSize="24sp"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@+id/endText" />
+
+        <Button
+            android:id="@+id/start"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="1dp"
+            android:onClick="start"
+            android:text="start"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@+id/eta" />
+
+        <Button
+            android:id="@+id/next"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginEnd="148dp"
+            android:onClick="next"
+            android:text="next"
+            android:visibility="invisible"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toEndOf="parent" />
+
+        <Button
+            android:id="@+id/end"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginEnd="1dp"
+            android:onClick="end"
+            android:text="end"
+            android:visibility="invisible"
+            app:layout_constraintBaseline_toBaselineOf="@+id/next"
+            app:layout_constraintEnd_toEndOf="@+id/next" />
+
+    </android.support.constraint.ConstraintLayout>
+
+
+</FrameLayout>
